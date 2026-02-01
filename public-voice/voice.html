@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rock–Paper–Scissors–Bomb · Voice</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 1.5rem; background: #0f0f12; color: #e8e8ed; }
+    h1 { font-size: 1.35rem; margin-bottom: 0.5rem; }
+    .tagline { color: #888; font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .score { display: flex; gap: 1rem; margin-bottom: 1rem; padding: 0.75rem; background: #1a1a20; border-radius: 8px; }
+    .score span { font-weight: 600; }
+    .round { color: #888; font-size: 0.9rem; margin-bottom: 1rem; }
+    button { padding: 0.75rem 1.25rem; font-size: 1rem; font-weight: 600; border: none; border-radius: 8px; cursor: pointer; }
+    .btn-record { background: #6c9eff; color: #0f0f12; }
+    .btn-record:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-record.recording { background: #f87171; }
+    .btn-new { background: transparent; color: #888; border: 1px solid #333; margin-top: 1rem; }
+    .btn-new:hover { color: #e8e8ed; border-color: #666; }
+    .result { margin-top: 1rem; padding: 1rem; background: #1a1a20; border-radius: 8px; border-left: 4px solid #6c9eff; }
+    .result .transcribed { color: #888; font-size: 0.9rem; margin-bottom: 0.5rem; }
+    .result .response { font-size: 1rem; line-height: 1.5; }
+    .result .final { margin-top: 0.75rem; font-weight: 600; color: #4ade80; }
+    .error { color: #f87171; margin-top: 0.5rem; }
+    .status { color: #888; font-size: 0.9rem; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Rock–Paper–Scissors–Bomb · Voice</h1>
+  <p class="tagline">Speak your move. The AI Judge will respond with voice.</p>
+
+  <div class="score">
+    <span>Round <span id="round">1</span></span>
+    <span>You: <span id="user-score">0</span></span>
+    <span>Bot: <span id="bot-score">0</span></span>
+  </div>
+
+  <button type="button" class="btn-record" id="btn-record">Hold to speak your move</button>
+  <button type="button" class="btn-new" id="btn-new">New game</button>
+
+  <div class="result" id="result" style="display: none;">
+    <div class="transcribed" id="transcribed"></div>
+    <div class="response" id="response"></div>
+    <div class="final" id="final" style="display: none;"></div>
+  </div>
+  <div class="error" id="error"></div>
+  <div class="status" id="status"></div>
+
+  <script>
+    const btnRecord = document.getElementById('btn-record');
+    const btnNew = document.getElementById('btn-new');
+    const resultEl = document.getElementById('result');
+    const transcribedEl = document.getElementById('transcribed');
+    const responseEl = document.getElementById('response');
+    const finalEl = document.getElementById('final');
+    const errorEl = document.getElementById('error');
+    const statusEl = document.getElementById('status');
+    const roundEl = document.getElementById('round');
+    const userScoreEl = document.getElementById('user-score');
+    const botScoreEl = document.getElementById('bot-score');
+
+    let mediaRecorder = null;
+    let chunks = [];
+
+    function setStatus(text) {
+      statusEl.textContent = text;
+      errorEl.textContent = '';
+    }
+
+    function setError(text) {
+      errorEl.textContent = text;
+      statusEl.textContent = '';
+    }
+
+    function updateScores(round, userScore, botScore) {
+      roundEl.textContent = round;
+      userScoreEl.textContent = userScore;
+      botScoreEl.textContent = botScore;
+    }
+
+    async function startRecording() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        chunks = [];
+        mediaRecorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          stream.getTracks().forEach((t) => t.stop());
+          sendAudio();
+        };
+        mediaRecorder.start();
+        btnRecord.textContent = 'Recording… release to send';
+        btnRecord.classList.add('recording');
+      } catch (err) {
+        setError('Microphone access denied or unavailable.');
+      }
+    }
+
+    function stopRecording() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+        btnRecord.textContent = 'Hold to speak your move';
+        btnRecord.classList.remove('recording');
+      }
+    }
+
+    btnRecord.addEventListener('mousedown', (e) => { e.preventDefault(); startRecording(); });
+    btnRecord.addEventListener('mouseup', stopRecording);
+    btnRecord.addEventListener('mouseleave', stopRecording);
+    btnRecord.addEventListener('touchstart', (e) => { e.preventDefault(); startRecording(); });
+    btnRecord.addEventListener('touchend', (e) => { e.preventDefault(); stopRecording(); });
+
+    async function sendAudio() {
+      if (chunks.length === 0) {
+        setError('No audio recorded.');
+        return;
+      }
+      setStatus('Sending…');
+      resultEl.style.display = 'none';
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = async () => {
+        const base64 = reader.result.split(',')[1];
+        try {
+          setStatus('Judge is thinking…');
+          const res = await fetch('/api/voice', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ audioBase64: base64, mimeType: 'audio/webm' }),
+          });
+          const data = await res.json();
+          setStatus('');
+          if (!res.ok) {
+            setError(data.error || 'Request failed.');
+            return;
+          }
+          if (data.gameOver) {
+            transcribedEl.textContent = '';
+            responseEl.textContent = data.message || 'Game over.';
+            finalEl.style.display = 'block';
+            finalEl.textContent = data.finalResult || '';
+            updateScores(data.round ?? 1, data.userScore ?? 0, data.botScore ?? 0);
+          } else {
+            transcribedEl.textContent = 'You said: "' + (data.transcribedText || '') + '"';
+            responseEl.textContent = data.response || '';
+            finalEl.style.display = 'none';
+            updateScores(data.round ?? 1, data.userScore ?? 0, data.botScore ?? 0);
+            if (data.audioBase64) {
+              const audio = new Audio('data:audio/mpeg;base64,' + data.audioBase64);
+              audio.play().catch(() => {});
+            }
+          }
+          resultEl.style.display = 'block';
+        } catch (err) {
+          setError(err.message || 'Network error.');
+        }
+      };
+    }
+
+    btnNew.addEventListener('click', async () => {
+      try {
+        await fetch('/api/new-game', { method: 'POST' });
+        resultEl.style.display = 'none';
+        updateScores(1, 0, 0);
+        setError('');
+        setStatus('New game started.');
+        setTimeout(() => { setStatus(''); }, 2000);
+      } catch (err) {
+        setError(err.message || 'Failed to start new game.');
+      }
+    });
+  </script>
+</body>
+</html>
