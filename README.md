@@ -82,6 +82,3 @@ Rules and decisions live in **`src/assignment/rules-and-prompt.js`**. The code i
 
 ---
 
-## License
-
-MIT.
