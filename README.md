@@ -8,17 +8,19 @@ Prompt-driven AI Judge for a Rock–Paper–Scissors–Bomb scenario. The user s
 
 ```bash
 npm install
-cp .env.example .env   # set ANTHROPIC_API_KEY (https://console.anthropic.com/)
+cp .env.example .env   # set ONE of: GEMINI_API_KEY or ANTHROPIC_API_KEY
 npm start              # or: npm run assignment
 ```
 
 Then enter your move in free text each round (3 rounds). Type `quit` or `exit` to end early.
 
+**Judge API:** Use **either** Gemini or Claude. Set `GEMINI_API_KEY` ([Google AI Studio](https://aistudio.google.com/apikey)) **or** `ANTHROPIC_API_KEY` ([Anthropic Console](https://console.anthropic.com/)). If both are set, Claude is used.
+
 ### Optional: Voice mode (ElevenLabs)
 
-Speak your move and hear the Judge response. You need **ELEVENLABS_API_KEY** (and **ANTHROPIC_API_KEY** for the Judge).
+Speak your move and hear the Judge response. You need **ELEVENLABS_API_KEY** plus **one** Judge key (Gemini or Claude). If ElevenLabs is not set, the CLI (text) is unchanged and works as before.
 
-1. Add to `.env`: `ELEVENLABS_API_KEY=your_key` (get it from [ElevenLabs](https://elevenlabs.io/) → Profile → API key).
+1. Add to `.env`: `ELEVENLABS_API_KEY=your_key` (get it from [ElevenLabs](https://elevenlabs.io/) → Profile → API key), and keep one Judge key (Gemini or Claude).
 2. Run: `npm run voice`.
 3. Open **http://localhost:3001**, allow the microphone, then **hold** the button while you say your move (e.g. “rock”, “scissors”, “bomb”) and release. The app transcribes with ElevenLabs, runs the Judge (Claude), and plays the response with TTS.
 
@@ -33,7 +35,7 @@ Speak your move and hear the Judge response. You need **ELEVENLABS_API_KEY** (an
 | `src/assignment/state.js` | Minimal state: round, userScore, botScore, bombUsed |
 | `src/assignment/normalize-input.js` | Spelling correction for moves (e.g. "scissor" → "scissors") so the Judge understands intent |
 | `src/assignment/index.js` | CLI loop: input → normalize → judge → print response → update state → final result |
-| `.env.example` | Template for `ANTHROPIC_API_KEY` (and optional `ANTHROPIC_MODEL`) |
+| `.env.example` | Template for `GEMINI_API_KEY` or `ANTHROPIC_API_KEY` (use one); optional voice keys |
 | `ASSIGNMENT_TASKS.md` | Step-by-step task breakdown (optional reference) |
 | `server-voice.js` | Optional voice server: STT (ElevenLabs) → Judge → TTS |
 | `src/assignment/elevenlabs.js` | ElevenLabs transcribe + speak helpers |
@@ -49,7 +51,7 @@ The solution separates:
 2. **Game logic** — Is the move valid? Who won the round? (bomb beats all; bomb vs bomb = draw; bomb once only) — driven by the prompt.
 3. **Response generation** — Round number, moves played, round winner, what happens next — driven by the prompt.
 
-Rules and decisions live in **`src/assignment/rules-and-prompt.js`**. The code in `ai-judge.js` and `index.js` does **not** encode win conditions or intent rules; it only calls the Claude API with the built prompt and parses the JSON (`intent`, `round_winner`, `response`). State in `state.js` is minimal: round, user score, bot score, bomb used.
+Rules and decisions live in **`src/assignment/rules-and-prompt.js`**. The code in `ai-judge.js` and `index.js` does **not** encode win conditions or intent rules; it only calls the chosen API (Gemini or Claude) with the built prompt and parses the JSON (`intent`, `round_winner`, `response`). State in `state.js` is minimal: round, user score, bot score, bomb used.
 
 ---
 

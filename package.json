@@ -11,6 +11,7 @@
   "keywords": [
     "rock-paper-scissors",
     "ai-judge",
+    "gemini",
     "claude",
     "anthropic",
     "prompt-design"
@@ -19,6 +20,7 @@
   "license": "MIT",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
+    "@google/generative-ai": "^0.21.0",
     "dotenv": "^16.4.5",
     "form-data": "^4.0.0"
   }
